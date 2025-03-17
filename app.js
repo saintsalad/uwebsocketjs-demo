@@ -54,19 +54,50 @@ function broadcastChat(message, senderId) {
   clients.forEach((userId, client) => client.send(data));
 }
 
+// Add CORS handling for WebSocket upgrades
 app.ws("/*", {
+  // Add upgrade handler for CORS
+  upgrade: (res, req, context) => {
+    // Get the origin header
+    const origin = req.getHeader("origin");
+
+    // Set CORS headers to allow all origins (for development)
+    // For production, you should restrict this to specific trusted origins
+    res.writeHeader("Access-Control-Allow-Origin", origin || "*");
+    res.writeHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.writeHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type"
+    );
+    res.writeHeader("Access-Control-Allow-Credentials", "true");
+
+    // Upgrade the connection
+    res.upgrade(
+      {
+        // Custom data to attach to the WebSocket
+        userId: nextUserId++,
+      },
+      // Second argument is the requested URL
+      req.getHeader("sec-websocket-key"),
+      req.getHeader("sec-websocket-protocol"),
+      req.getHeader("sec-websocket-extensions"),
+      context
+    );
+  },
+
   open: (ws) => {
-    // Assign a unique user ID
-    const userId = nextUserId++;
+    // Use the userId we attached during upgrade
+    const userId = ws.getUserData().userId;
     clients.set(ws, userId);
 
-    // Send initial boy position WITH color
+    // Send initial boy position WITH color AND size
     ws.send(
       JSON.stringify({
         action: "update_boy",
         x: boy.x,
         y: boy.y,
         color: boy.color,
+        size: boy.size,
       })
     );
 
@@ -75,6 +106,7 @@ app.ws("/*", {
 
     console.log(`New viewer connected (ID: ${userId})`);
   },
+
   message: (ws, message) => {
     let data = JSON.parse(Buffer.from(message));
     const userId = clients.get(ws);

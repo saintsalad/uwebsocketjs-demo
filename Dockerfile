@@ -35,7 +35,5 @@ FROM base
 COPY --from=build /app /app
 
 # Start the server by default, this can be overwritten at runtime
-# Use port 8080 as Fly.io expects this for internal routing
-ENV PORT=8080
-EXPOSE 8080
-CMD [ "node", "app.js" ]
+EXPOSE 3000
+CMD [ "node", "index.js" ]

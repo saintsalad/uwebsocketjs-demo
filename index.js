@@ -4,8 +4,17 @@ const app = App();
 let clients = new Map();
 let nextUserId = 1;
 
-// Initial boy position
-let boy = { x: 100, y: 100, speed: 2, color: "blue", size: 20 };
+// Initial boy position with added rotation and opacity properties
+let boy = {
+  x: 100,
+  y: 100,
+  speed: 2,
+  color: "blue",
+  size: 20,
+  rotation: 0,
+  opacity: 1,
+  shape: "square",
+};
 let boxes = [boy]; // Initialize with the original "boy"
 let moveInterval = null;
 let colorToggleInterval = null;
@@ -45,6 +54,9 @@ function broadcastState() {
   const data = JSON.stringify({
     action: "update_boxes",
     boxes: boxes,
+    // For accurate latency, use client start time + server response time
+    // instead of server-only timestamp
+    serverTime: Date.now(),
   });
   clients.forEach((userId, client) => client.send(data));
 }
@@ -107,6 +119,7 @@ app.ws("/*", {
         JSON.stringify({
           action: "update_boxes",
           boxes: boxes,
+          serverTime: Date.now(),
         })
       );
 
@@ -136,6 +149,19 @@ app.ws("/*", {
       const userId = clients.get(ws);
       console.log(`Received message from User ${userId}:`, data);
 
+      // Handle ping messages for accurate latency measurement
+      if (data.action === "ping") {
+        // Echo back the client's timestamp for round-trip calculation
+        ws.send(
+          JSON.stringify({
+            action: "pong",
+            clientTime: data.clientTime,
+            serverTime: Date.now(),
+          })
+        );
+        return;
+      }
+
       if (data.action === "chat") {
         console.log(`Chat from User ${userId}: ${data.text}`);
 
@@ -156,6 +182,9 @@ app.ws("/*", {
                 speed: 2 + Math.random() * 4,
                 color: "blue",
                 size: 20,
+                rotation: 0,
+                opacity: 1,
+                shape: "square",
               });
             }
           }
@@ -191,6 +220,8 @@ app.ws("/*", {
               box.color = colors[Math.floor(Math.random() * colors.length)];
               // Random size between 10 and 60
               box.size = 10 + Math.floor(Math.random() * 50);
+              // Add rotation changes
+              box.rotation = (box.rotation + 15) % 360;
             });
             broadcastState();
           }, 100);
@@ -198,7 +229,18 @@ app.ws("/*", {
           // Reset after 5 seconds
           setTimeout(() => {
             // Reset to a single box with default properties
-            boxes = [{ x: 100, y: 100, speed: 2, color: "blue", size: 20 }];
+            boxes = [
+              {
+                x: 100,
+                y: 100,
+                speed: 2,
+                color: "blue",
+                size: 20,
+                rotation: 0,
+                opacity: 1,
+                shape: "square",
+              },
+            ];
             boy = boxes[0]; // Update boy reference to match the first box
 
             startMovementInterval(1000);
@@ -311,7 +353,7 @@ app.ws("/*", {
             const data = JSON.stringify({
               action: "update_boxes",
               boxes: boxes,
-              timestamp: Date.now(), // Client can use this to measure latency
+              serverTime: Date.now(), // Use serverTime instead of timestamp
               frame: frame,
             });
             clients.forEach((userId, client) => client.send(data));
@@ -326,7 +368,18 @@ app.ws("/*", {
             broadcastState = originalBroadcastState;
 
             // Reset to a single box with default properties
-            boxes = [{ x: 100, y: 100, speed: 2, color: "blue", size: 20 }];
+            boxes = [
+              {
+                x: 100,
+                y: 100,
+                speed: 2,
+                color: "blue",
+                size: 20,
+                rotation: 0,
+                opacity: 1,
+                shape: "square",
+              },
+            ];
             boy = boxes[0]; // Update boy reference to match the first box
 
             startMovementInterval(1000);

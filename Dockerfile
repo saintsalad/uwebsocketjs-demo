@@ -34,6 +34,6 @@ FROM base
 # Copy built application
 COPY --from=build /app /app
 
-# Start the server by default, this can be overwritten at runtime
-EXPOSE 3000
+# Expose the port that matches your application's listening port
+EXPOSE 8080
 CMD [ "npm", "start" ]

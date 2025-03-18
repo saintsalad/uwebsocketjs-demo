@@ -10,8 +10,8 @@ let moveInterval = null;
 let colorToggleInterval = null;
 let sizeToggleInterval = null;
 
-// Use PORT environment variable with fallback to 9001 for local development
-const PORT = process.env.PORT || 9001;
+// Use PORT environment variable with fallback to 8080 for local development
+const PORT = process.env.PORT || 8080;
 
 function moveBoyRandomly() {
   boy.x += (Math.random() * 10 - 5) * boy.speed;

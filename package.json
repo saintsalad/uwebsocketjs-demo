@@ -2,5 +2,8 @@
   "dependencies": {
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.51.0"
   },
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  }
 }

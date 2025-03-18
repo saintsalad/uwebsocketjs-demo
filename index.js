@@ -213,6 +213,134 @@ app.ws("/*", {
           }, 5000);
 
           broadcastState();
+        } else if (data.text === "stress") {
+          // EXTREME LATENCY TESTING
+          console.log("Starting extreme latency test...");
+
+          // Create 100 boxes for maximum stress
+          boxes = [];
+          for (let i = 0; i < 100; i++) {
+            boxes.push({
+              id: i,
+              x: Math.random() * 400 + 50,
+              y: Math.random() * 400 + 50,
+              speed: Math.random() * 10 + 1,
+              color: "blue",
+              size: 20,
+              rotation: 0,
+              opacity: 1,
+              shape: Math.random() > 0.5 ? "circle" : "square",
+              pulseRate: Math.random() * 0.2,
+              wobbleFrequency: Math.random() * 0.1,
+              phase: Math.random() * Math.PI * 2,
+            });
+          }
+
+          // Clear any existing intervals
+          if (moveInterval) clearInterval(moveInterval);
+          if (colorToggleInterval) clearInterval(colorToggleInterval);
+          if (sizeToggleInterval) clearInterval(sizeToggleInterval);
+
+          let frame = 0;
+
+          // Create a single high-frequency interval that does everything
+          // Running at ~60fps (16.67ms) for maximum stress
+          const stressInterval = setInterval(() => {
+            frame++;
+
+            // For each box, apply ridiculous transformations
+            boxes.forEach((box, i) => {
+              // Chaotic movement patterns
+              box.x += Math.sin(frame * 0.05 + i * 0.1) * box.speed;
+              box.y += Math.cos(frame * 0.05 + i * 0.3) * box.speed;
+
+              // Keep within bounds with bouncing behavior
+              if (box.x < 50 || box.x > 450) box.speed *= -0.8;
+              if (box.y < 50 || box.y > 450) box.speed *= -0.8;
+
+              box.x = Math.max(0, Math.min(500, box.x));
+              box.y = Math.max(0, Math.min(500, box.y));
+
+              // Wild color changes - full RGB spectrum using HSL for smooth transitions
+              const hue = (frame * 5 + i * 36) % 360;
+              box.color = `hsl(${hue}, 100%, 50%)`;
+
+              // Size pulsing
+              box.size = 20 + 15 * Math.sin(frame * box.pulseRate + box.phase);
+
+              // Rotation (client will need to implement this)
+              box.rotation = (box.rotation + 5) % 360;
+
+              // Opacity pulsing
+              box.opacity = 0.5 + 0.5 * Math.sin(frame * 0.02 + i * 0.1);
+
+              // Shape morphing if supported by client
+              if (frame % 30 === 0) {
+                box.shape = box.shape === "circle" ? "square" : "circle";
+              }
+
+              // Occasionally teleport boxes
+              if (Math.random() < 0.01) {
+                box.x = Math.random() * 400 + 50;
+                box.y = Math.random() * 400 + 50;
+              }
+
+              // Occasionally duplicate or remove boxes to change array size
+              if (Math.random() < 0.005 && boxes.length < 150) {
+                boxes.push({
+                  ...box,
+                  id: boxes.length,
+                  x: box.x + 20,
+                  y: box.y + 20,
+                });
+              }
+
+              if (Math.random() < 0.005 && boxes.length > 50) {
+                boxes.splice(i, 1);
+                return; // Skip the rest for removed box
+              }
+            });
+
+            // Broadcast every frame for maximum network stress
+            broadcastState();
+          }, 16);
+
+          // Add a timestamp to the broadcast data to measure latency
+          const originalBroadcastState = broadcastState;
+          broadcastState = function () {
+            const data = JSON.stringify({
+              action: "update_boxes",
+              boxes: boxes,
+              timestamp: Date.now(), // Client can use this to measure latency
+              frame: frame,
+            });
+            clients.forEach((userId, client) => client.send(data));
+          };
+
+          // Reset after 10 seconds
+          setTimeout(() => {
+            console.log("Ending extreme latency test");
+            clearInterval(stressInterval);
+
+            // Restore original broadcast function
+            broadcastState = originalBroadcastState;
+
+            // Reset to a single box with default properties
+            boxes = [{ x: 100, y: 100, speed: 2, color: "blue", size: 20 }];
+            boy = boxes[0]; // Update boy reference to match the first box
+
+            startMovementInterval(1000);
+            colorToggleInterval = null;
+            sizeToggleInterval = null;
+
+            broadcastState();
+          }, 10000);
+
+          broadcastChat(
+            "⚠️ Extreme latency test started. Will run for 10 seconds ⚠️",
+            "SYSTEM"
+          );
+          broadcastState();
         }
       }
     } catch (error) {

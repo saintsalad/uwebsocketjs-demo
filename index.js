@@ -6,6 +6,7 @@ let nextUserId = 1;
 
 // Initial boy position
 let boy = { x: 100, y: 100, speed: 2, color: "blue", size: 20 };
+let boxes = [boy]; // Initialize with the original "boy"
 let moveInterval = null;
 let colorToggleInterval = null;
 let sizeToggleInterval = null;
@@ -14,12 +15,15 @@ let sizeToggleInterval = null;
 const PORT = process.env.PORT || 8080;
 
 function moveBoyRandomly() {
-  boy.x += (Math.random() * 10 - 5) * boy.speed;
-  boy.y += (Math.random() * 10 - 5) * boy.speed;
+  // Update all boxes
+  boxes.forEach((box) => {
+    box.x += (Math.random() * 10 - 5) * box.speed;
+    box.y += (Math.random() * 10 - 5) * box.speed;
 
-  // Keep within bounds
-  boy.x = Math.max(50, Math.min(450, boy.x));
-  boy.y = Math.max(50, Math.min(450, boy.y));
+    // Keep within bounds
+    box.x = Math.max(50, Math.min(450, box.x));
+    box.y = Math.max(50, Math.min(450, box.y));
+  });
 
   broadcastState();
 }
@@ -39,11 +43,8 @@ startMovementInterval(1000);
 // Broadcast boy's position & chat to all clients
 function broadcastState() {
   const data = JSON.stringify({
-    action: "update_boy",
-    x: boy.x,
-    y: boy.y,
-    color: boy.color,
-    size: boy.size,
+    action: "update_boxes",
+    boxes: boxes,
   });
   clients.forEach((userId, client) => client.send(data));
 }
@@ -59,6 +60,7 @@ function broadcastChat(message, senderId) {
 
 // Add HTTP route for health checks (important for Fly.io)
 app.get("/health", (res, req) => {
+  console.log("Health check received");
   res.writeStatus("200 OK");
   res.writeHeader("Content-Type", "application/json");
   res.end(JSON.stringify({ status: "ok", connections: clients.size }));
@@ -99,15 +101,12 @@ app.ws("/*", {
     const userId = nextUserId++;
     clients.set(ws, userId);
 
-    // Send initial boy position WITH color AND size
+    // Send initial boxes state
     try {
       ws.send(
         JSON.stringify({
-          action: "update_boy",
-          x: boy.x,
-          y: boy.y,
-          color: boy.color,
-          size: boy.size,
+          action: "update_boxes",
+          boxes: boxes,
         })
       );
 
@@ -143,65 +142,73 @@ app.ws("/*", {
         broadcastChat(`User ${userId}: ${data.text}`, userId);
 
         if (data.text === "jump") {
-          boy.y -= 50;
+          boxes.forEach((box) => (box.y -= 50));
           broadcastState();
         } else if (data.text === "run") {
-          // Increase speed moderately but increase update frequency for smoothness
-          boy.speed = 8;
+          // Reset to single box if we're not already in "run" mode
+          if (boxes.length === 1 && !colorToggleInterval) {
+            // Create 10 boxes (including the original)
+            boxes = [boy]; // Start with original boy
+            for (let i = 1; i < 10; i++) {
+              boxes.push({
+                x: 100 + (Math.random() * 200 - 100),
+                y: 100 + (Math.random() * 200 - 100),
+                speed: 2 + Math.random() * 4,
+                color: "blue",
+                size: 20,
+              });
+            }
+          }
 
-          // Update position 10 times per second instead of once per second
+          // Set all boxes to high speed
+          boxes.forEach((box) => (box.speed = 4 + Math.random() * 4));
+
+          // Update position more frequently for smoothness
           startMovementInterval(100);
 
-          // Use array of colors instead of just red/green
-          const colors = ["red", "green", "blue", "purple", "orange", "yellow"];
-          let colorIndex = 0;
-          boy.color = colors[0]; // Start with first color
+          // Array of colors
+          const colors = [
+            "red",
+            "green",
+            "blue",
+            "purple",
+            "orange",
+            "yellow",
+            "pink",
+            "cyan",
+            "magenta",
+            "lime",
+          ];
 
-          // Create interval to toggle colors
-          if (colorToggleInterval) {
-            clearInterval(colorToggleInterval);
-          }
+          // Clear any existing intervals
+          if (colorToggleInterval) clearInterval(colorToggleInterval);
+          if (sizeToggleInterval) clearInterval(sizeToggleInterval);
 
-          // Create interval to toggle size
-          if (sizeToggleInterval) {
-            clearInterval(sizeToggleInterval);
-          }
-
-          // Change colors every 100ms, cycling through array
+          // Randomly change colors and sizes
           colorToggleInterval = setInterval(() => {
-            colorIndex = (colorIndex + 1) % colors.length;
-            boy.color = colors[colorIndex];
-            // Force broadcast with each color change to ensure size is also sent
+            boxes.forEach((box) => {
+              // Random color for each box
+              box.color = colors[Math.floor(Math.random() * colors.length)];
+              // Random size between 10 and 60
+              box.size = 10 + Math.floor(Math.random() * 50);
+            });
             broadcastState();
           }, 100);
 
-          // Toggle size between small and large
-          let growingSize = true;
-          boy.size = 20; // Reset size before starting
-          sizeToggleInterval = setInterval(() => {
-            // Make size changes more dramatic
-            if (growingSize) {
-              boy.size += 8;
-              if (boy.size >= 60) growingSize = false;
-            } else {
-              boy.size -= 8;
-              if (boy.size <= 10) growingSize = true;
-            }
-            // We're broadcasting from the color interval now
-          }, 50);
-
           // Reset after 5 seconds
           setTimeout(() => {
-            boy.speed = 2;
+            // Reset to a single box with default properties
+            boxes = [{ x: 100, y: 100, speed: 2, color: "blue", size: 20 }];
+            boy = boxes[0]; // Update boy reference to match the first box
+
             startMovementInterval(1000);
 
-            // Stop toggling and reset to defaults
+            // Stop toggling intervals
             clearInterval(colorToggleInterval);
             clearInterval(sizeToggleInterval);
             colorToggleInterval = null;
             sizeToggleInterval = null;
-            boy.color = "blue";
-            boy.size = 20;
+
             broadcastState();
           }, 5000);
 
